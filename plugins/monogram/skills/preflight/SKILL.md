@@ -1,9 +1,9 @@
 ---
 name: preflight
-description: Preflight, a local pre-push and pre-merge code review for any git repo. One review that covers bugs, error handling, edge cases and tests, plus what general reviewers miss — security, performance, the repo's own written rules, docs and contracts across sibling repos, migrations — and verifies every finding against the code before reporting it. A project profile adds that project's repos, checks and rules. Use inside a repo when the user asks to "review this branch", "review my changes", "pre-push review", "is this ready to merge", "re-review since the last push", "security review", or "review the spec" or ADR, "run Preflight" (the name its reviews carry on GitHub), "/subcore-review" (its old name), and when the user asks how the reviews are doing or to improve the review from its results. Not for replying to or resolving existing PR review comments.
+description: Code Preflight (Preflight for short), a local pre-push and pre-merge code review for any git repo. One review that covers bugs, error handling, edge cases and tests, plus what general reviewers miss — security, performance, the repo's own written rules, docs and contracts across sibling repos, migrations — and verifies every finding against the code before reporting it. A project profile adds that project's repos, checks and rules. Use inside a repo when the user asks to "review this branch", "review my changes", "pre-push review", "is this ready to merge", "re-review since the last push", "security review", or "review the spec" or ADR, "run Preflight" (the name its reviews carry on GitHub) or "run Code Preflight", "/subcore-review" (its old name), and when the user asks how the reviews are doing or to improve the review from its results. Not for replying to or resolving existing PR review comments.
 ---
 
-# Preflight
+# Code Preflight
 
 Built from 2,900 bot findings on 615 PRs of the Subcore repos and the author's reply to each, and from a blind benchmark of six review skills on nine of those PRs. Three rules come from that record:
 

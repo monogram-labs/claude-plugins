@@ -1,7 +1,7 @@
 {
   "name": "monogram",
-  "version": "1.2.0",
-  "description": "Preflight: a pre-push and pre-merge code review that checks every finding against the code before it reports it, plus a PR gate and a ledger that scores the review on real PRs.",
+  "version": "1.2.1",
+  "description": "Code Preflight: a pre-push and pre-merge code review that checks every finding against the code before it reports it, plus a PR gate and a ledger that scores the review on real PRs.",
   "author": { "name": "Monogram Labs" },
   "repository": "https://github.com/monogram-labs/claude-plugins",
   "license": "MIT",

@@ -58,7 +58,7 @@ def diff_lines(repo, pr):
     return out
 
 
-FOOTER = ('<sub>Preflight, from the monogram plugin, checks every finding against the code before posting. '
+FOOTER = ('<sub>Code Preflight, from the monogram plugin, checks every finding against the code before posting. '
           'Reply on a thread to decline one with evidence.</sub>')
 
 

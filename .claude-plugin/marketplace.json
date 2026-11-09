@@ -7,8 +7,8 @@
     {
       "name": "monogram",
       "source": "./plugins/monogram",
-      "description": "Preflight: a pre-push and pre-merge code review that checks every finding against the code before it reports it, plus a PR gate and a ledger that scores the review on real PRs.",
-      "version": "1.2.0",
+      "description": "Code Preflight: a pre-push and pre-merge code review that checks every finding against the code before it reports it, plus a PR gate and a ledger that scores the review on real PRs.",
+      "version": "1.2.1",
       "author": { "name": "Monogram Labs" },
       "category": "development",
       "keywords": ["code-review", "preflight", "pull-request"]

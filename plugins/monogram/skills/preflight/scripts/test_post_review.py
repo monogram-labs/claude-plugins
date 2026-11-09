@@ -25,7 +25,7 @@ def main():
     checks = [
         ('never approves or blocks', payload['event'] == 'COMMENT' and payload['commit_id'] == 'abc123'),
         ('the review starts with the tag and counts what is posted', first_line == '[✈️ Preflight] 2 findings, each checked against the code'),
-        ('the footer names Preflight and how to decline', 'Preflight, from the monogram plugin' in body and 'decline one with evidence' in body),
+        ('the footer names Code Preflight and how to decline', 'Code Preflight, from the monogram plugin' in body and 'decline one with evidence' in body),
         ('a finding in the diff is an inline thread, with its range', len(comments) == 1 and comments[0]['line'] == 20 and comments[0]['start_line'] == 18),
         ('each thread starts with the tag', comments[0]['body'].startswith('[✈️ Preflight] **1. Inside the diff**')),
         ('the hidden marker is the new one', '<!-- preflight:fp=app:lib/a.ts:f:inside -->' in comments[0]['body']),

@@ -1,6 +1,6 @@
 # Monogram Labs Claude Code plugins
 
-A plugin marketplace for Monogram Labs. It holds one plugin, **monogram**, which brings **Preflight**: a pre-push and pre-merge code review that checks every finding against the code before reporting it.
+A plugin marketplace for Monogram Labs. It holds one plugin, **monogram**, which brings **Code Preflight** (Preflight for short): a pre-push and pre-merge code review that checks every finding against the code before reporting it.
 
 ## Install
 

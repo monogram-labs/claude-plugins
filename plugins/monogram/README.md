@@ -1,6 +1,6 @@
 # monogram
 
-**Preflight** reviews your branch before you open a pull request, and again after each push.
+**Code Preflight** (Preflight for short) reviews your branch before you open a pull request, and again after each push.
 
 - **Run it:** `/monogram:preflight`, or say "run Preflight", inside any git repo. It reviews your branch's diff against where it split from main, plus uncommitted work. It reads the surrounding code, the tests, the repo's written rules and, for a project with a profile, the sibling repos. Every finding is checked against the code by its own agent before you see it.
 - **Cost:** a full review takes about 15 to 20 minutes and uses about 2 to 3 million tokens, mostly in the agents that check each finding. On a plan with a usage limit that is a noticeable share, so run it before you push, not after every edit. A review after a push covers only the new commits and costs less.
