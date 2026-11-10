@@ -31,6 +31,9 @@ def main():
         f.write('gen/*.ts linguist-generated\n*.md text\n')
     a, o, r, c = prof.detect(api), prof.detect(other), prof.detect(renamed), prof.detect(offline)
     gen = prof.generated_regexes(o, other)
+    os.makedirs(os.path.join(T, 'by-name'))  # a teammate who cloned the api under its repo name, not the profile's folder
+    web2 = repo(os.path.join(T, 'by-name', 'web'), 'https://github.com/acme/web')
+    api2 = repo(os.path.join(T, 'by-name', 'acme-api'), 'git@github.com:acme/api.git')
     checks = [
         ('a GitHub slug finds the profile repo', a.profile and a.profile['name'] == 'example' and a.repo == 'acme-api'),
         ('a clone in a folder of another name still matches by slug', r.repo == 'acme-web' and r.github == 'acme/web'),
@@ -39,6 +42,7 @@ def main():
         ('a gated profile gates, no profile does not', prof.gated(a) and not prof.gated(o)),
         ('by_slug finds a gated repo, case-insensitively', prof.gated(prof.by_slug('ACME/web')) and prof.by_slug('someone/widgets') is None),
         ('siblings are the profile repos next to this one', prof.siblings(api, a) == [web]),
+        ('a sibling cloned under its repo name is found too', prof.siblings(web2, prof.detect(web2)) == [api2]),
         ('no profile, no siblings', prof.siblings(other, o) == []),
         ('generated: lockfiles always, .gitattributes too', any(g.search('bun.lock') for g in gen)
          and any(g.search('gen/client.ts') for g in gen) and not any(g.search('README.md') for g in gen)),

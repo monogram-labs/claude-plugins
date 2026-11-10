@@ -7,13 +7,16 @@ Usage:
   ledger.py settle [--include-open]   for each reviewed PR that is merged or closed, read its threads
                                       (gh, read-only): which of our findings were fixed, declined or
                                       ignored, and which other reviewers' findings were fixed
-  ledger.py report [--since DATE] [--json]
+  ledger.py report [--since DATE] [--json] [--mine]
   ledger.py note "TEXT"               record a change to the skill, so reports compare before and after
 
 A finding another reviewer raised, that the author fixed, and that sits nowhere near one of ours
 is a miss: the thing to learn from. The ledger lives at ~/.claude/preflight/ledger.json
 (PREFLIGHT_LEDGER overrides it; an older ~/.claude/subcore-review/ledger.json is read once and moved).
 PREFLIGHT_REPOS (paths joined by the OS path separator) replaces the repo discovery, for tests.
+
+In a profile with "sharedResults": true (shared.py), sync and settle also push this reviewer's runs
+to the profile's repo, and report, run in one of its repos, covers everyone's runs unless --mine.
 """
 import datetime, glob, json, os, re, subprocess, sys
 
@@ -21,6 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from threads import title_of  # noqa: E402
 import profile as prof  # noqa: E402
+import shared  # noqa: E402
 LEDGER = os.environ.get('PREFLIGHT_LEDGER') or os.path.expanduser('~/.claude/preflight/ledger.json')
 OLD_LEDGER = os.path.expanduser('~/.claude/subcore-review/ledger.json')
 STATUS = {'addressed': 'fixed', 'fixed': 'fixed', 'dismissed': 'declined', 'declined': 'declined',
@@ -207,17 +211,22 @@ def settle(led, include_open=False, pr_fn=gh_pr, threads_fn=None):
 def report(led, since=None):
     runs = [r for r in led['runs'].values() if not since or (r.get('reviewedAt') or '') >= since]
     out = {'reviews': len(runs), 'settled': sum(r.get('settled', {}).get('prState') in ('MERGED', 'CLOSED') for r in runs),
-           'outcomes': {}, 'byVersion': {}, 'byFinder': {}, 'bySeverity': {}, 'misses': [], 'missesRefuted': 0, 'declined': []}
+           'outcomes': {}, 'byVersion': {}, 'byFinder': {}, 'bySeverity': {}, 'byReviewer': {}, 'misses': [], 'missesRefuted': 0,
+           'declined': []}
     def bump(table, name, outcome):
         row = table.setdefault(name or 'unrecorded', {})
         row[outcome] = row.get(outcome, 0) + 1
     for r in runs:
         ver = version_of(r.get('skillVersion')) or 'unrecorded'
         bump(out['byVersion'], ver, 'reviews')
+        if r.get('by'):  # only shared runs name their reviewer
+            bump(out['byReviewer'], r['by'], 'reviews')
         for f in r['findings'].values():
             o = f.get('outcome') or f['status']
             out['outcomes'][o] = out['outcomes'].get(o, 0) + 1
             bump(out['byVersion'], ver, o)
+            if r.get('by'):
+                bump(out['byReviewer'], r['by'], o)
             bump(out['bySeverity'], f.get('severity'), o)
             for name in dict.fromkeys(n for x in f.get('finders') or [None] for n in finder_names(x)):
                 bump(out['byFinder'], name, o)
@@ -242,9 +251,14 @@ def rate(row):
 
 def print_report(r):
     o = r['outcomes']
+    if r.get('team'):
+        t = r['team']
+        n = len(r['byReviewer'])
+        print(f"Shared results of the {t['profile']} profile, from {n} reviewer{'' if n == 1 else 's'}." + (f" ({t['warning']})" if t.get('warning') else ''))
     print(f"{r['reviews']} reviews, {r['settled']} on merged or closed PRs. Findings: " +
           (', '.join(f'{v} {k}' for k, v in sorted(o.items())) or 'none') + f" ({rate(o)}).")
-    for title, key in (('By skill version', 'byVersion'), ('By finder', 'byFinder'), ('By severity', 'bySeverity')):
+    tables = (('By reviewer', 'byReviewer'),) if r['byReviewer'] else ()
+    for title, key in tables + (('By skill version', 'byVersion'), ('By finder', 'byFinder'), ('By severity', 'bySeverity')):
         print(f'\n{title}:')
         for name, row in sorted(r[key].items()):
             extra = ''.join(f", {row[k]} {k}" for k in ('reviews', 'misses') if row.get(k))
@@ -261,12 +275,23 @@ def main():
     a = sys.argv[1:]
     cmd = a[0] if a else ''
     led = load()
-    if cmd == 'sync':
-        n = sync(led); save(led); print(json.dumps({'synced': n, 'ledger': LEDGER}))
-    elif cmd == 'settle':
-        n = settle(led, include_open='--include-open' in a); save(led); print(json.dumps({'settled': n}))
+    if cmd in ('sync', 'settle'):
+        n = sync(led) if cmd == 'sync' else settle(led, include_open='--include-open' in a)
+        save(led)
+        out = {'synced': n, 'ledger': LEDGER} if cmd == 'sync' else {'settled': n}
+        pub = shared.publish(led)
+        print(json.dumps({**out, **({'shared': pub} if pub else {})}))
     elif cmd == 'report':
-        r = report(led, a[a.index('--since') + 1] if '--since' in a else None)
+        root = git(os.getcwd(), 'rev-parse', '--show-toplevel')
+        p = prof.detect(root).profile if root else None
+        team = None
+        if p and p.get('sharedResults') and '--mine' not in a:
+            team, warning = shared.team(p)
+            team['notes'] = led['notes']
+            settle(team)  # in memory: PRs that closed since their reviewer last ran settle
+        r = report(team or led, a[a.index('--since') + 1] if '--since' in a else None)
+        if team:
+            r['team'] = {'profile': p['name'], **({'warning': warning} if warning else {})}
         print(json.dumps(r, indent=1)) if '--json' in a else print_report(r)
     elif cmd == 'note' and len(a) > 1:
         led['notes'].append({'at': now(), 'text': a[1]}); save(led); print('noted')

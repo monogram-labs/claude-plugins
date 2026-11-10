@@ -7,7 +7,7 @@
 - **On GitHub:** once the PR is open, a run posts its findings as one review, and every message starts with `[✈️ Preflight]`. Posts appear under your own GitHub account, because they go through your `gh` login. After a push, it reviews only the new commits and resolves its own threads that a commit fixed.
 - **Declining a finding:** reply on its thread with your reason. Preflight re-checks once and leaves the thread open.
 - **The PR gate:** in a project whose profile turns it on, `gh pr create` is held until Preflight has reviewed the branch's latest commit. Skip it for one PR with `PREFLIGHT_SKIP=1 gh pr create ...`. Other repos are never held.
-- **How it's doing:** ask "how are the reviews doing?" It reports what you fixed, what you declined, and what other reviewers caught that Preflight missed, from `~/.claude/preflight/ledger.json`. Each person's ledger covers their own reviews.
+- **How it's doing:** ask "how are the reviews doing?" It reports what you fixed, what you declined, and what other reviewers caught that Preflight missed, from `~/.claude/preflight/ledger.json`. Each person's ledger covers their own reviews, unless the team shares results (below).
 
 ## Profiles
 
@@ -18,6 +18,8 @@ A repo with no profile still gets a full review. It uses the repo's own written 
 To add a project, copy `skills/preflight/profiles/example/` to `~/.claude/preflight/profiles/<name>/`, edit `profile.json` (its repos' GitHub names and folders, and whether the PR gate applies), and rewrite the three Markdown files. Each repo can also keep a checked-in `REVIEW.md` with a "Never flag" section. That file is authoritative for its repo, and CodeRabbit can read it too.
 
 Keep your own profiles private: they describe your systems, including gaps a review should not re-raise.
+
+**Sharing results across a team.** Set `"sharedResults": true` in `profile.json` when the profile's folder is a clone of a repo the team shares. After each review, Preflight writes your results to `results/<your GitHub login>/` in that repo, commits only that folder, and pushes it. Each person writes only their own folder, so nobody's files conflict. Asking "how are the reviews doing?" in one of the profile's repos then reports on everyone's reviews, by reviewer. The files hold findings, file paths and outcomes, not code. A push that fails waits for the next review.
 
 ## Credits
 

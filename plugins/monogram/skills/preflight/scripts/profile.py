@@ -6,7 +6,8 @@ PREFLIGHT_PROFILES (folders joined by the OS path separator) replaces both, for 
 
 A profile is a folder <profiles>/<name>/:
 - profile.json: its repos (GitHub slug, folder, generated paths), extra generated globs, signal
-  patterns, and whether the PR gate holds `gh pr create` in its repos;
+  patterns, whether the PR gate holds `gh pr create` in its repos, and whether the team shares
+  review results through the profile's own repo ("sharedResults", see shared.py);
 - repos.md: notes per repo (guidance files, gates, mirrors), under "## <repo>" headings;
 - checks.md: extra checks per repo, the same way;
 - never-flag.md: what not to report, the same way, plus "## All repos".
@@ -125,15 +126,19 @@ def signals(match):
 
 
 def siblings(root, match):
-    """The profile's other repos that sit next to this checkout. None without a profile."""
+    """The profile's other repos that sit next to this checkout, under their folder or their repo name. None without a profile."""
     if not match.profile:
         return []
     parent = os.path.dirname(os.path.abspath(root))
     out = []
     for name, r in match.profile.get('repos', {}).items():
-        path = os.path.join(parent, r.get('folder', name))
-        if name != match.repo and os.path.abspath(path) != os.path.abspath(root) and os.path.isdir(os.path.join(path, '.git')):
-            out.append(path)
+        if name == match.repo:
+            continue
+        for folder in dict.fromkeys((r.get('folder', name), name)):
+            path = os.path.join(parent, folder)
+            if os.path.abspath(path) != os.path.abspath(root) and os.path.isdir(os.path.join(path, '.git')):
+                out.append(path)
+                break
     return out
 
 

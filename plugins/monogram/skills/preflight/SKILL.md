@@ -171,11 +171,12 @@ The ledger (`scripts/ledger.py`, kept at `~/.claude/preflight/ledger.json`) is h
   - the fix rate by skill version, finder and severity;
   - the misses: other reviewers' findings the author fixed, nowhere near one of ours, marked when a check refuted a candidate at that spot;
   - our declined findings.
+- **A team's shared results.** When the profile sets `"sharedResults": true`, its folder is a clone of the team's profile repo. `sync` and `settle` then also write this reviewer's runs to `results/<login>/` there and push them (`scripts/shared.py`). `report`, run in one of the profile's repos, pulls and covers everyone's runs, with a By reviewer table; `--mine` reports this machine alone. Say so in one line when `sync` reports a push that failed: the commit waits for the next sync.
 - **Act on it, then record the change.** Never edit this skill where it is installed (`$SKILL_DIR`, under `~/.claude/plugins/`): the next plugin update replaces it, and the change is lost. A change goes where it lasts:
   - A miss that recurs and is particular to this project becomes a check in the profile's `checks.md`, in `~/.claude/preflight/profiles/<name>/`. With no profile, it is a rule for the repo's AGENTS.md or CLAUDE.md, or a CI check.
   - A decline that recurs becomes a "Never flag" line in the repo's `REVIEW.md` (Step 6), or in the profile's `never-flag.md`.
   - A miss any repo could have, a finder whose findings are rarely fixed, or a check that wrongly refutes the same kind of finding is a change to Preflight itself. Write it up as a proposed edit to the plugin's source, `plugins/monogram/skills/preflight/` in https://github.com/monogram-labs/claude-plugins: the file, the old text, the new text, and the ledger numbers behind it. Show it to the user; they open the issue or PR, and a release bumps `VERSION`.
-  - Show every proposed change before making it, and make a profile or repo change only on a yes.
+  - Show every proposed change before making it, and make a profile or repo change only on a yes. When the profile is a shared repo, the change goes in as a pull request there, so the team accepts or rejects it.
   - Then `ledger.py note "<what changed and why>"`, so the next report can compare before and after.
 - **Mechanical misses go to CI, not to a lens.** A placeholder left in a changelog or an export nothing imports is cheaper and surer as a check in the repo's CI. Propose it in that repo instead.
 - One review's numbers are noise: in testing, the same setup swung 10 points between runs. Decide from the ledger's totals, never from one PR.
