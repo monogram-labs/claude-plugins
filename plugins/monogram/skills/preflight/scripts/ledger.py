@@ -41,16 +41,17 @@ def version_of(v):
 
 
 def finder_names(name):
-    """The finders a label names. Runs wrote "Claims+Standards", "Perf", "General A", "Contracts (app review)"."""
+    """The finders a label names. Runs wrote "Claims+Standards", "Perf", "General A", "Contracts (app review)".
+    The scanner keeps its own row; any other label that names no finder ("push review 0e4a30ce", "self review") is "other"."""
     if not name:
         return [None]
     out = []
-    for part in re.split(r'\s*(?:\+|,|\band\b)\s*', re.sub(r'\s*\(.*?\)', '', name)):
+    for part in re.split(r'\s*(?:\+|,|/|\band\b)\s*', re.sub(r'\s*\(.*?\)', '', name)):
         word = re.split(r'[\s-]', part.strip())[0].lower()
         hit = next((f for f in FINDERS if len(word) >= 4 and f.lower().startswith(word)), None)
         if hit and hit not in out:
             out.append(hit)
-    return out or [name]
+    return out or (['scanner'] if name.strip().lower() == 'scanner' else ['other'])
 
 
 def now():
@@ -212,7 +213,7 @@ def report(led, since=None):
     runs = [r for r in led['runs'].values() if not since or (r.get('reviewedAt') or '') >= since]
     out = {'reviews': len(runs), 'settled': sum(r.get('settled', {}).get('prState') in ('MERGED', 'CLOSED') for r in runs),
            'outcomes': {}, 'byVersion': {}, 'byFinder': {}, 'bySeverity': {}, 'byReviewer': {}, 'misses': [], 'missesRefuted': 0,
-           'declined': []}
+           'missesBy': {}, 'declined': []}
     def bump(table, name, outcome):
         row = table.setdefault(name or 'unrecorded', {})
         row[outcome] = row.get(outcome, 0) + 1
@@ -236,6 +237,7 @@ def report(led, since=None):
             if t['outcome'] == 'fixed' and not t['nearOurs']:
                 bump(out['byVersion'], ver, 'misses')
                 out['missesRefuted'] += bool(t.get('nearRefuted'))
+                out['missesBy'][t['by'] or 'unknown'] = out['missesBy'].get(t['by'] or 'unknown', 0) + 1
                 mark = ' [a check refuted a candidate here]' if t.get('nearRefuted') else ''
                 out['misses'].append(f"{r['repo']}#{r.get('pr')} {t['by']} {t['path']}:{t['line']}{mark}: {t['title']}")
     last = max((n['at'] for n in led['notes']), default='')
@@ -245,8 +247,10 @@ def report(led, since=None):
 
 
 def rate(row):
-    fixed, declined = row.get('fixed', 0), row.get('declined', 0)
-    return f"{fixed}/{fixed + declined} fixed" if fixed + declined else 'no outcomes yet'
+    """Fixed out of fixed or declined. Findings never posted as a thread have no outcome; they are counted beside it."""
+    fixed, declined, unknown = row.get('fixed', 0), row.get('declined', 0), row.get('open', 0)
+    out = f"{fixed}/{fixed + declined} fixed" if fixed + declined else 'no outcomes yet'
+    return out + (f", {unknown} no outcome" if unknown else '')
 
 
 def print_report(r):
@@ -266,6 +270,8 @@ def print_report(r):
     print(f"\nMisses: other reviewers' findings the author fixed, nowhere near ours ({len(r['misses'])}, "
           f"{r['missesRefuted']} where a check refuted a candidate):")
     print('\n'.join(f'  {m}' for m in r['misses'][-15:]) or '  none yet')
+    if r['missesBy']:
+        print('  By the reviewer that raised them: ' + ', '.join(f'{k} {v}' for k, v in sorted(r['missesBy'].items(), key=lambda kv: -kv[1])))
     print(f"\nOur declined findings, candidates for a Never-flag line ({len(r['declined'])}):")
     print('\n'.join(f'  {d}' for d in r['declined'][-10:]) or '  none yet')
     print(f"\n{r['settledSinceLastNote']} PRs settled since the last recorded change to the skill. At 20, act on this report (SKILL.md, Step 7).")

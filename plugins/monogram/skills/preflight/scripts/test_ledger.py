@@ -107,9 +107,13 @@ def main():
         ('old version labels map to the skill VERSION', [L.version_of(v) for v in ('1.0.3', 'monogram 1.1.1', 'monogram-1.1.1', '11', None)]
          == ['9', '11', '11', '11', None]),
         ('finder labels map to the finders they name', [L.finder_names(n) for n in ('Claims+Standards', 'Performance and quality',
-         'Security and performance', 'Perf', 'General A', 'General-MCP', 'Contracts (app review)', 'scanner', None)]
+         'Security and performance', 'Perf', 'General A', 'General-MCP', 'Contracts (app review)', 'Contracts/Design',
+         'scanner', 'push review 0e4a30ce', 'self review', None)]
          == [['Claims', 'Standards'], ['Performance'], ['Security', 'Performance'], ['Performance'], ['General'], ['General'],
-             ['Contracts'], ['scanner'], [None]]),
+             ['Contracts'], ['Contracts', 'Design'], ['scanner'], ['other'], ['other'], [None]]),
+        ('report counts misses by the reviewer that raised them', r['missesBy'] == {'coderabbitai': 1}),
+        ('a rate counts findings with no outcome beside it', L.rate({'fixed': 3, 'declined': 1, 'open': 2}) == '3/4 fixed, 2 no outcome'
+         and L.rate({'open': 2}) == 'no outcomes yet, 2 no outcome'),
     ]
     out = subprocess.run([sys.executable, LEDGER_PY, 'report'], capture_output=True, text=True)
     checks.append(('report prints', out.returncode == 0 and 'Misses' in out.stdout and '1 PRs settled' in out.stdout))
