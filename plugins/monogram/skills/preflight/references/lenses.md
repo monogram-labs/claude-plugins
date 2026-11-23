@@ -15,6 +15,7 @@ Every check ends the same way: if it finds something, name the trigger and the c
    - **cancelled:** never clear the flag of the request that replaced it;
    - **poisoned:** a failure cached as an empty result, or a retry budget that never resets;
    - **unknown:** a non-idempotent call that failed in transit. Mark the outcome unknown and re-read, and release an idempotency reservation only on a definite refusal.
+   - **Fill in the table, don't skim the list.** For each new `await` or server-action call in UI code, a hook or a handler, write one row: the call site, then for superseded, failed and cancelled the line that handles it, or "none". Every "none" a real caller can reach is a candidate. Return the rows under `coverage` (finder.md). Superseded includes the reader moving to another org, agent or record while the call runs: its result must not land in the new one. A server action called inside `startTransition` or an event handler with no `catch` is a failed row with "none". From 2026-10-30 to 11-21, 8 misses in four repos were rows of this table: a result written into the next agent's list, live rows dropped when the first read finished, a rejection nobody caught.
 3. **State ownership.** Name each piece of state and its owner (org, core, case, session, thread, file, build, page), and check that it resets when the owner changes.
    - A framework that keeps a subtree mounted across navigation (the Next.js App Router does) resets nothing on its own. Key the subtree on the full scope, distinct from sibling keys.
    - A registry keys on the stable scope id, never on a per-connection one.
@@ -29,20 +30,27 @@ Every check ends the same way: if it finds something, name the trigger and the c
    - traps: `slice(-0)`, `$&` in `replace`, PostgREST `max-rows`, NULL ordering, `ORDER BY` ties.
    - Check library behaviour in the installed source in `node_modules`. If only a run would settle it, report it as suspected; its verifier runs the probe.
 8. **Error and timeout paths.** No `catch` swallows errors it wasn't written for, and cleanup doesn't hide the original error. Cancellation propagates. Outbound work has a deadline and a retry limit.
+   - **Ignored errors.** A result shaped `{ data, error }` (Supabase, PostgREST, many SDKs) checks `error` before it uses `data`, and before a fallback that would hide it (a default time zone, an empty list). A failed read is not "no rows".
+   - **Missing values.** For each new read of something that can be absent, name what happens when it is: a header, an env var, a CLI argument, a callback's argument, an optional row, a lookup by a key that came from input (`CONFIGS[arg]`, `map.get(id)`). It fails loudly with a clear message, or takes a stated default. It never reaches a property access on `undefined` or a silent `"undefined"` in a URL. From 2026-10-30 to 11-21, 8 misses in five repos were this, in API, CLI and UI code alike.
 9. **UI states.**
    - States: empty account, loading, failed lookup, null, zero items, narrow width. Each shows a true sentence and a way forward.
    - Interaction: rows work by keyboard, nothing is tooltip-only, focus moves into what opens, reduced motion is respected.
-   - Pending work: while a save or delete is in flight, every way out (Cancel, Escape, a click outside, back, closing the sheet) is disabled or still lands the result safely, and a second submit can't start. On real PRs, this was missed in two repos.
+   - Keys: Enter in a text field never starts a costly or irreversible action (a payment, a send, a delete) unless that is the form's only button. Enter and other key handlers ignore IME composition (`event.nativeEvent.isComposing`). A key that removes something (Backspace on a chip) goes through the same guard as the click.
+   - Pending work: while a save or delete is in flight, every way out (Cancel, Escape, a click outside, back, closing the sheet) is disabled or still lands the result safely, and a second submit can't start. **Fill in the table:** for each new dialog, sheet or form with an async action, write one row per way out, naming what it does while the action runs. Return the rows under `coverage`. This was missed 3 times before the check was added as a one-line rule, and 5 more times in two repos after.
 
 ## L2: Contracts and integration
 
 General reviewers miss this most. In testing, two general review skills caught 1 of 5 integration findings, and docs, specs and changelogs a change made false were a third of all accepted findings. For a project with a profile, read the sibling repos' main branch (`repos.md`).
 
 1. **Copies of a changed fact.** For every name, number, route, default, limit, version or behaviour the diff changes, `rg` this repo and the siblings, and flag each copy that is now false. Look in the same page, specs, READMEs, AGENTS.md, comments, SQL `COMMENT ON`, docs MDX, setup prompts, `.rest` examples, MCP tool descriptions and synced skills.
-2. **Claims vs code.** Open the code behind each sentence the diff adds or edits.
-   - Find the exception to each absolute ("always", "never", "every", "once").
+2. **Claims vs code.** Open the code behind each sentence the diff adds or edits, in docs, specs, READMEs and CHANGELOGs alike.
+   - Find the exception to each absolute ("always", "never", "every", "once", "guaranteed").
+   - A timeout, a wait or a retry limit is a bound, not a guarantee: flag a sentence that says something is sure to happen within it.
    - Give a version-dependent claim its version boundary.
+   - Every example (a code block, a JSON body, sample values, a fallback) gives the result the code gives for it. Trace it through the code.
+   - A required order of steps (migration, then API, then console) is stated wherever a reader acts on it: migration notes, release notes, upgrade steps. Flag a place that leaves it out or says otherwise.
    - Docs' shell commands must run as written. Report one you doubt; its verifier runs it.
+   - From 2026-10-30 to 11-21, 9 misses in six repos were docs that promised more than the code: a guarantee after a failure, a wrong example, a missing rollout order, a runbook that said entries stay masked when the code unmasks them.
 3. **Rules that contradict each other.**
    - List every rule the change adds or edits: "never", "always", "must", "only", a refusal, a default.
    - Check each against every other rule in the same doc and in the specs it links. Example: a sentence that says something never happens, beside a rule that makes it happen.
@@ -187,6 +195,11 @@ Adapted from the Standards axis of mattpocock/skills `code-review` (MIT, see `TH
 2. **Walk each rule that applies to the changed paths** against the diff. Report a rule the change breaks, quoting the file and the rule. Skip what a linter or test in this repo already enforces, the "Settled conventions", and anything a "Never flag" entry covers.
 3. **Records the repo keeps.** When the change makes the kind of decision a record here already logs (a dependency policy, a reversal of an ADR, a changed default), check that the record got its entry, and that an entry the change reverses is amended or superseded.
 4. **Code the change adds that nothing uses:** an export nothing imports, a parameter no caller passes, a branch no caller reaches. Search this repo and the siblings' main before you claim it.
+5. **Docs prose.** In the prose the change adds or edits in docs readers see (a docs site, a README, a CHANGELOG, a spec), report:
+   - a broken sentence: a doubled word or conjunction ("or a …, or an an …"), a list whose items don't share one shape, a sentence that says the opposite of what it means;
+   - a break of a prose rule the repo writes down (its AGENTS.md, a style guide, the profile's checks): quote the rule.
+   
+   Never report a rule that isn't written down, however common it is elsewhere. Severity Trivial, unless the sentence misleads a reader about behaviour (then L2.2). One candidate per paragraph. Before this item, only a reviewer outside Preflight caught these.
 
 A rule here is a standard to enforce, not a taste. Never report a code smell by name ("Feature Envy", "Primitive Obsession"): in the benchmark those judgement calls made up most of the false findings.
 

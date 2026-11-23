@@ -49,7 +49,7 @@ Push mode and the state file follow `$SKILL_DIR/references/state.md`.
 
 Run the scanners and the brief first: they take seconds, and the finders start from them. Then start the gates in the background (`run_in_background`) and let them run while the finders work.
 
-- **Gates** from the profile's `repos.md`, or with no profile, from the repo's own scripts (`package.json`, a Makefile, the CI workflow): lint, type-check, the nearest tests. Results go on the report's Gates line. A failure the change introduced makes the verdict "needs rework". To tell whether a failure is pre-existing, check CI for the base commit (`gh run list --commit <base>`), or say "not checked at base". Never run a command the repo notes forbid.
+- **Gates** from the profile's `repos.md`, or with no profile, from the repo's own scripts (`package.json`, a Makefile, the CI workflow): lint, type-check, the nearest tests, and the repo-wide guard tests that CI runs on every change whatever it touches (a dependency-declaration test, an import-rule test). Those are cheap and fail on files far from the change: in the ledger, an undeclared test dependency reached review because only the changed test file was run. Results go on the report's Gates line. A failure the change introduced makes the verdict "needs rework". To tell whether a failure is pre-existing, check CI for the base commit (`gh run list --commit <base>`), or say "not checked at base". Never run a command the repo notes forbid.
 - **Scanners:** `python3 "$SKILL_DIR/scripts/scan.py" --base <base> --head <head> [--working-tree] [--online]`. Pass `--online` unless you are offline: it lets `bun audit` reach the npm advisory API.
   - It runs gitleaks, actionlint, zizmor, shellcheck and squawk when they are installed.
   - Otherwise it uses built-in checks: secrets in added lines, migration RLS, grants and `SECURITY DEFINER` hygiene, edits to applied migrations, workflow injection, risky dependencies, and a missing schema regeneration.
@@ -76,13 +76,13 @@ Launch finder subagents with the Agent tool (`subagent_type: general-purpose`, `
 | **Security** | `signals.security`, `signals.data`, `signals.ci`, `signals.dependencies` or `signals.shell` is non-empty, or the user asked for a security review | L6, plus the scanner hits for secrets, migrations, workflows and dependencies. |
 | **Performance and quality** | `signals.performance` or `signals.client` is non-empty | L7 (hot paths only) and L8 (code quality, at most 3 candidates). |
 | **Design** | spec mode, or the change adds a contract: a route, error code, table or column, state machine, or a rule another repo or a consumer must follow (a peer dependency or version floor counts) | L4. Before calling a rule undefined, check that the spec, its ADRs and the schema don't define it: in testing, most Design candidates were refuted that way. |
-| **Standards** | always | L9: every rule in this repo's own guidance files and decision records, walked against the diff, plus code the change adds that nothing uses. |
+| **Standards** | always | L9: every rule in this repo's own guidance files and decision records, walked against the diff, plus code the change adds that nothing uses, and the prose of the docs the change edits. |
 | **Claims** | always | L10: what the change says about itself (commits, PR text, changeset, migration notes, the spec it names), checked against the code, and what it leaves unsaid. |
 
 Every finder also gets this repo's L5 checks. L5 is not split by area, so give each finder all of them.
 
 Sizing:
-- **Large:** split General by area, for example server and client, or one finder per package.
+- **Large:** split General by area, one General finder per package or folder group of about 1,500 changed lines (server and client, or one per app). Over 3,000 lines, split Contracts and Standards the same way. Label each split finder with its area, such as "General (auth)", so the ledger still scores it as General. Verify the top 20 candidates, plus 8 for each split finder beyond the first. In the ledger, a 286-file PR reviewed with one General finder drew 20 misses, and a 106-file PR drew 15.
 - **Quick** (only when the user asks for one, Step 1): two finders. One is the General finder exactly as in a full review; the other covers L2 and L6, plus L4 when the change adds a contract. Verify at most 8 candidates, and say that it was a quick pass. In testing, a quick pass led by ponytail's checks in place of General caught less than half as much.
 - **Push mode:** size by the increment, and include the earlier findings in each finder's prompt.
 
@@ -103,7 +103,7 @@ First triage in the main thread:
 2. Drop a candidate in triage only when a "Never flag" entry clearly covers it: same kind of claim, same kind of file, and none of the entry's exceptions apply. The entries come from the repo's `REVIEW.md` (checked in; authoritative for that repo) and `precedents.md` (cross-repo rules, and repo rules for a repo with no `REVIEW.md` yet). In testing, broad matching in triage threw away two real findings. When a match is a judgment call, keep the candidate and let its verifier weigh the entry against the code.
    - The entries that matter for a candidate are the `**` ones plus those whose path glob matches one of its sites. With no `REVIEW.md`, take them from `precedents.md`'s "All repos" section and this repo's own section only. The context file and the brief carry them to the checks.
 3. The General finder may return obra's "Declined to judge" list. Promote a line from it only if it names a concrete trigger.
-4. Rank by proposed severity. Verify the top 20, and list the rest as "not verified (cap)".
+4. Rank by proposed severity. Verify the top 20 (more on a split review, Step 3), and list the rest as "not verified (cap)".
 
 Then verify them in one round, at the usual effort (do not pass `effort`: at medium, checks let through more false findings). Send the checks in batches of at most 12 per message; send the next batch once every check in the last one has returned. The harness runs at most 20 subagents at a time across the whole session, so a larger message fails with "Concurrent subagent limit reached"; retry a launch that fails that way once, after its batch returns.
 - **Every candidate gets its own fresh `general-purpose` subagent,** whatever its severity, and it may run code to settle the claim. In testing, one checker shared by several minor candidates threw out real findings.
@@ -168,8 +168,8 @@ The ledger (`scripts/ledger.py`, kept at `~/.claude/preflight/ledger.json`) is h
 
 - **Every run:** `ledger.py sync` after saving the state (Step 5).
 - **When the user asks how the reviews are doing, or every 20 settled PRs:** run `ledger.py sync`, `ledger.py settle` (reads PR threads through `gh`, read-only), then `ledger.py report`. The report gives:
-  - the fix rate by skill version, finder and severity;
-  - the misses: other reviewers' findings the author fixed, nowhere near one of ours, marked when a check refuted a candidate at that spot;
+  - the fix rate by skill version, finder and severity, with the findings that have no outcome (never posted as a thread) counted beside it;
+  - the misses: other reviewers' findings the author fixed, nowhere near one of ours, marked when a check refuted a candidate at that spot, and counted by the reviewer that raised them. A reviewer the team stops using leaves its share of misses with nobody else to catch them;
   - our declined findings.
 - **A team's shared results.** When the profile sets `"sharedResults": true`, its folder is a clone of the team's profile repo. `sync` and `settle` then also write this reviewer's runs to `results/<login>/` there and push them (`scripts/shared.py`). `report`, run in one of the profile's repos, pulls and covers everyone's runs, with a By reviewer table; `--mine` reports this machine alone. Say so in one line when `sync` reports a push that failed: the commit waits for the next sync.
 - **Act on it, then record the change.** Never edit this skill where it is installed (`$SKILL_DIR`, under `~/.claude/plugins/`): the next plugin update replaces it, and the change is lost. A change goes where it lasts:
